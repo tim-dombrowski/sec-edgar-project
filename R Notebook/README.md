@@ -100,6 +100,33 @@ library(edgar)
 library(rjson)
 ```
 
+## Setting the User Agent
+
+Before making any requests to the SEC’s EDGAR server, we need to
+configure a user agent string. The SEC’s [fair access
+policy](https://www.sec.gov/os/accessing-edgar-data) requires that all
+programmatic access to EDGAR identify the requester so that the SEC can
+contact you if there are any issues with your data requests. Starting
+with version 2.0.8 of the edgar package, this is enforced as a required
+parameter for all functions that download data from SEC servers.
+
+The user agent should follow the format
+`"YourName YourEmail@domain.com"`. Replace the placeholder values in the
+code chunk below with your own name and a valid contact email address
+before running any of the code chunks that communicate with the SEC’s
+servers.
+
+``` r
+# Set user agent for SEC EDGAR API access
+# Replace with your own name and contact email address
+# See https://www.sec.gov/os/accessing-edgar-data for more information
+useragent = "YourName YourEmail@domain.com"
+```
+
+This `useragent` variable will be passed as a parameter to the edgar
+package functions that communicate with the SEC’s servers throughout the
+rest of this notebook.
+
 ## Explore Master Indexes
 
 The first tool from the edgar package that we’ll review is the
@@ -110,13 +137,13 @@ requested years and store them in a compressed format (using
 [gzip](https://www.gzip.org/), which saves the compressed files with a
 .gz extension). Then for each year, the tool will also aggregate the
 four quarters of filing data into an R data file (extension .Rda).
-Below, we download the master indexes file for 2021.
+Below, we download the master indexes file for 2023.
 
 ``` r
-getMasterIndex(2021)
+getMasterIndex(2023, useragent)
 ```
 
-    ## Downloading Master Indexes from SEC server for 2021 ...
+    ## Downloading Master Indexes from SEC server for 2023 ...
     ## Master Index for quarter 1 
     ## Master Index for quarter 2 
     ## Master Index for quarter 3 
@@ -132,24 +159,24 @@ before the `load()` function because the renv package also has a
 function named `load()`, which overrides the base R function.*
 
 ``` r
-base::load("edgar_MasterIndex/2021master.Rda")
+base::load("edgar_MasterIndex/2023master.Rda")
 head(year.master)
 ```
 
     ##       cik           company.name form.type date.filed
-    ## 1 1000045 NICHOLAS FINANCIAL INC      10-Q 2021-02-11
-    ## 2 1000045 NICHOLAS FINANCIAL INC       4/A 2021-02-12
-    ## 3 1000045 NICHOLAS FINANCIAL INC         4 2021-02-08
-    ## 4 1000045 NICHOLAS FINANCIAL INC         4 2021-02-09
-    ## 5 1000045 NICHOLAS FINANCIAL INC       8-K 2021-01-25
-    ## 6 1000045 NICHOLAS FINANCIAL INC       8-K 2021-02-03
+    ## 1 1000045 NICHOLAS FINANCIAL INC      10-Q 2023-02-09
+    ## 2 1000045 NICHOLAS FINANCIAL INC       4/A 2023-02-10
+    ## 3 1000045 NICHOLAS FINANCIAL INC         4 2023-01-25
+    ## 4 1000045 NICHOLAS FINANCIAL INC         4 2023-02-01
+    ## 5 1000045 NICHOLAS FINANCIAL INC       8-K 2023-01-19
+    ## 6 1000045 NICHOLAS FINANCIAL INC       8-K 2023-02-02
     ##                                    edgar.link quarter
-    ## 1 edgar/data/1000045/0001564590-21-005399.txt       1
-    ## 2 edgar/data/1000045/0001398344-21-003309.txt       1
-    ## 3 edgar/data/1000045/0001496701-21-000001.txt       1
-    ## 4 edgar/data/1000045/0001398344-21-002769.txt       1
-    ## 5 edgar/data/1000045/0001564590-21-002004.txt       1
-    ## 6 edgar/data/1000045/0001564590-21-003940.txt       1
+    ## 1 edgar/data/1000045/0001564590-23-003142.txt       1
+    ## 2 edgar/data/1000045/0001398344-23-001897.txt       1
+    ## 3 edgar/data/1000045/0001496701-23-000001.txt       1
+    ## 4 edgar/data/1000045/0001398344-23-001422.txt       1
+    ## 5 edgar/data/1000045/0001564590-23-001254.txt       1
+    ## 6 edgar/data/1000045/0001564590-23-002701.txt       1
 
 If we examine the format of the variables, we can see that the edgar
 package just stores each variable as a character array, except for the
@@ -207,7 +234,7 @@ Then we can save the reformatted master index table to a new name so we
 can compare the file sizes.
 
 ``` r
-save(year.master,file="edgar_MasterIndex/2021master_new.Rda")
+save(year.master,file="edgar_MasterIndex/2023master_new.Rda")
 ```
 
 Using the `file.size()` function to display the size of the original
@@ -215,60 +242,95 @@ master index table to the new formatted version, we can see that it
 reduced in size by over 10%.
 
 ``` r
-oldsize = file.size("edgar_MasterIndex/2021master.Rda")
+oldsize = file.size("edgar_MasterIndex/2023master.Rda")
 oldsize
 ```
 
-    ## [1] 13260810
+    ## [1] 14182204
 
 ``` r
-newsize = file.size("edgar_MasterIndex/2021master_new.Rda")
+newsize = file.size("edgar_MasterIndex/2023master_new.Rda")
 newsize
 ```
 
-    ## [1] 11701533
+    ## [1] 12507642
 
 ``` r
 newsize/oldsize
 ```
 
-    ## [1] 0.8824146
+    ## [1] 0.8819567
 
 Since our new table is better formatted, let’s replace the old one. But
 let’s also save the old one just in case these formatting changes break
 some of the other functions in the package.
 
 ``` r
-file.rename("edgar_MasterIndex/2021master.Rda","edgar_MasterIndex/2021master_old.Rda")
+file.rename("edgar_MasterIndex/2023master.Rda","edgar_MasterIndex/2023master_old.Rda")
 ```
 
     ## [1] TRUE
 
 ``` r
-file.rename("edgar_MasterIndex/2021master_new.Rda","edgar_MasterIndex/2021master.Rda")
+file.rename("edgar_MasterIndex/2023master_new.Rda","edgar_MasterIndex/2023master.Rda")
 ```
 
     ## [1] TRUE
 
 ## Searching by CIK
 
-The SEC’s uses a [Central Index Key
-(CIK)](https://www.sec.gov/edgar/searchedgar/cik) to identify
-corporations and individuals that file disclosures. You can use the
-previous link to lookup a CIK for a company, fund, or individual;
-however, you can also just search in the [EDGAR
-database](https://www.sec.gov/edgar/searchedgar/companysearch), which
-will also produce the CIK for the entity. Or if you wish to
-programmatically parse through a list of tickers, there is a solution
-below that takes a list of tickers and matches it to the corresponding
-CIKs. However, to start, let’s manually specify a list of CIK numbers.
-
-For our example here, we’ll examine Airbnb Inc. (cik=1559720) and Las
-Vegas Sands Corp. (cik=1300514).
+The SEC uses a [Central Index Key
+(CIK)](https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany) to
+identify corporations and individuals that file disclosures. You can
+search the [EDGAR full-text
+search](https://efts.sec.gov/LATEST/search-index?q=%22central+index+key%22&dateRange=custom&startdt=2021-01-01)
+to look up a CIK for a specific company; however, it is also possible to
+look up CIKs programmatically. The SEC publishes a JSON file that maps
+ticker symbols to CIK numbers, which we can download and parse using the
+`fromJSON()` function from the rjson package.
 
 ``` r
-ciks = c(1559720,1300514)
+# Download the company ticker-to-CIK mapping from SEC EDGAR
+ticker.json = fromJSON(file="https://www.sec.gov/files/company_tickers.json")
+# Convert the nested list to a data frame
+ticker.df = data.frame(
+  cik = sapply(ticker.json, function(x) x$cik_str),
+  ticker = sapply(ticker.json, function(x) x$ticker),
+  company.name = sapply(ticker.json, function(x) x$title),
+  stringsAsFactors = FALSE
+)
+head(ticker.df)
 ```
+
+    ##       cik ticker                  company.name
+    ## 0  320193   AAPL                    Apple Inc.
+    ## 1  789019   MSFT               Microsoft Corp.
+    ## 2   51143    BRK-B Berkshire Hathaway Inc. (DE)
+    ## 3  2488     NVDA                    NVIDIA Corp
+    ## 4   12927   AMZN              Amazon.com, Inc.
+    ## 5  1067983  BRK-A Berkshire Hathaway Inc. (DE)
+
+Now we can look up the CIKs for any set of ticker symbols. For our
+example, we’ll examine Airbnb Inc. (ABNB) and Las Vegas Sands Corp.
+(LVS).
+
+``` r
+# Look up CIKs for our target tickers
+target.tickers = c("ABNB", "LVS")
+target.rows = ticker.df[ticker.df$ticker %in% target.tickers, ]
+target.rows
+```
+
+    ##          cik ticker             company.name
+    ## 4514 1300514    LVS LAS VEGAS SANDS CORP
+    ## 4603 1559720   ABNB            AIRBNB INC
+
+``` r
+ciks = target.rows$cik
+ciks
+```
+
+    ## [1] 1300514 1559720
 
 ## Computing Sentiment Measures
 
@@ -278,7 +340,7 @@ specified filings and generate a table showing some basic textual
 analysis statistics for the respective filings.
 
 ``` r
-sentidf = getSentiment(cik.no=ciks, form.type='10-K', filing.year=2021)
+sentidf = getSentiment(cik.no=ciks, form.type='10-K', filing.year=2023, useragent)
 ```
 
     ## Downloading fillings. Please wait... 
@@ -291,17 +353,17 @@ sentidf
 ```
 
     ##       cik         company.name form.type date.filed     accession.number
-    ## 1 1300514 LAS VEGAS SANDS CORP      10-K 2021-02-05 0001300514-21-000033
-    ## 2 1559720         Airbnb  Inc       10-K 2021-02-26 0001559720-21-000010
+    ## 1 1300514 LAS VEGAS SANDS CORP      10-K 2024-02-16 0001300514-24-000013
+    ## 2 1559720         AIRBNB  INC       10-K 2024-02-13 0001559720-24-000006
     ##   file.size word.count unique.word.count stopword.count char.count
-    ## 1     17452      56111              4334          13880     374137
-    ## 2      2664      81320              4903          22468     513178
+    ## 1     16814      52843              4201          13104     352891
+    ## 2      2987      87654              5102          24231     553042
     ##   complex.word.count lm.dictionary.count lm.negative.count lm.positive.count
-    ## 1              26123               50193              1097               362
-    ## 2              35790               78663              2731               664
+    ## 1              24718               47205              1034               341
+    ## 2              38214               84317              2918               712
     ##   lm.strong.modal.count lm.moderate.modal.count lm.weak.modal.count
-    ## 1                   211                     137                 398
-    ## 2                   259                     330                1144
+    ## 1                   198                     129                 374
+    ## 2                   271                     348                1213
     ##   lm.uncertainty.count lm.litigious.count hv.negative.count
-    ## 1                  834                693              2488
-    ## 2                 1818               1531              5170
+    ## 1                  791                652              2341
+    ## 2                 1934               1647              5512

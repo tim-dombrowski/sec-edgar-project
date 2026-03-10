@@ -34,6 +34,21 @@ My recommendation is to first run through the code using the versions of the pac
 
 If you update the packages and get everything working successfully, then you can update the lock file using the `renv::snapshot()` function. This will update the lock file with the versions of the packages that are currently installed in the project library. Then you can commit the updated lock file to the repository so that others can use the updated versions of the packages.
 
+## Setting the User Agent
+
+Before making any requests to the SEC's EDGAR server, we need to configure a user agent string. The SEC's [fair access policy](https://www.sec.gov/os/accessing-edgar-data) requires that all programmatic access to EDGAR identify the requester so that the SEC can contact you if there are any issues with your data requests. Starting with version 2.0.8 of the edgar package, this is enforced as a required parameter for all functions that download data from SEC servers.
+
+The user agent should follow the format `"YourName YourEmail@domain.com"`. Replace the placeholder values in the code chunk below with your own name and a valid contact email address before running any of the code chunks that communicate with the SEC's servers.
+
+```{r useragent}
+# Set user agent for SEC EDGAR API access
+# Replace with your own name and contact email address
+# See https://www.sec.gov/os/accessing-edgar-data for more information
+useragent = "YourName YourEmail@domain.com"
+```
+
+This `useragent` variable will be passed as a parameter to the edgar package functions that communicate with the SEC's servers throughout the rest of this notebook.
+
 ### Alternative Package Installation Code
 
 If you run into any trouble using renv in the code chunk above, then you can use the code chunk below to install the required packages for this analysis. This method will first check if you have already installed the packages. If any are missing, it will then install them. Then it will load the packages into the R session. A potential flaw in this approach compared to using renv is that it will simply install the latest versions of the packages, which could potentially break some of the code in this notebook if any of the updates aren't backwards compatible. 
@@ -55,16 +70,16 @@ library(rjson)
 
 ## Explore Master Indexes
 
-The first tool from the edgar package that we'll review is the `getMasterIndex()` function. This will create a sub-folder in the R Notebook directory named 'edgar_MasterIndex'. Within this folder, it will download a separate file for each of the four quarters within the requested years and store them in a compressed format (using [gzip](https://www.gzip.org/), which saves the compressed files with a .gz extension). Then for each year, the tool will also aggregate the four quarters of filing data into an R data file (extension .Rda). Below, we download the master indexes file for 2021.
+The first tool from the edgar package that we'll review is the `getMasterIndex()` function. This will create a sub-folder in the R Notebook directory named 'edgar_MasterIndex'. Within this folder, it will download a separate file for each of the four quarters within the requested years and store them in a compressed format (using [gzip](https://www.gzip.org/), which saves the compressed files with a .gz extension). Then for each year, the tool will also aggregate the four quarters of filing data into an R data file (extension .Rda). Below, we download the master indexes file for 2023.
 
 ```{r downloadmaster}
-getMasterIndex(2021)
+getMasterIndex(2023, useragent)
 ```
 
 We can load the master index from the .Rda file that was saved during the chunk above. One drawback of the .Rda data type is that we cannot assign it a new variable name when loading. So upon running the `base::load()` function, we can look to the Environment tab to see that the stored variable name is `year.master`. Then let's display the first few lines to see the data structure. *Note: we must include the `base::` before the `load()` function because the renv package also has a function named `load()`, which overrides the base R function.*
 
 ```{r displaymaster}
-base::load("edgar_MasterIndex/2021master.Rda")
+base::load("edgar_MasterIndex/2023master.Rda")
 head(year.master)
 ```
 
@@ -92,15 +107,15 @@ year.master$date.filed = as.Date(year.master$date.filed)
 Then we can save the reformatted master index table to a new name so we can compare the file sizes.
 
 ```{r savemaster}
-save(year.master,file="edgar_MasterIndex/2021master_new.Rda")
+save(year.master,file="edgar_MasterIndex/2023master_new.Rda")
 ```
 
 Using the `file.size()` function to display the size of the original master index table to the new formatted version, we can see that it reduced in size by over 10%.
 
 ```{r sizecomp}
-oldsize = file.size("edgar_MasterIndex/2021master.Rda")
+oldsize = file.size("edgar_MasterIndex/2023master.Rda")
 oldsize
-newsize = file.size("edgar_MasterIndex/2021master_new.Rda")
+newsize = file.size("edgar_MasterIndex/2023master_new.Rda")
 newsize
 newsize/oldsize
 ```
@@ -108,19 +123,40 @@ newsize/oldsize
 Since our new table is better formatted, let's replace the old one. But let's also save the old one just in case these formatting changes break some of the other functions in the package.
 
 ```{r replacemaster}
-file.rename("edgar_MasterIndex/2021master.Rda","edgar_MasterIndex/2021master_old.Rda")
-file.rename("edgar_MasterIndex/2021master_new.Rda","edgar_MasterIndex/2021master.Rda")
+file.rename("edgar_MasterIndex/2023master.Rda","edgar_MasterIndex/2023master_old.Rda")
+file.rename("edgar_MasterIndex/2023master_new.Rda","edgar_MasterIndex/2023master.Rda")
 ```
 
 
 ## Searching by CIK
 
-The SEC's uses a [Central Index Key (CIK)](https://www.sec.gov/edgar/searchedgar/cik) to identify corporations and individuals that file disclosures. You can use the previous link to lookup a CIK for a company, fund, or individual; however, you can also just search in the [EDGAR database](https://www.sec.gov/edgar/searchedgar/companysearch), which will also produce the CIK for the entity. Or if you wish to programmatically parse through a list of tickers, there is a solution below that takes a list of tickers and matches it to the corresponding CIKs. However, to start, let's manually specify a list of CIK numbers. 
+The SEC uses a [Central Index Key (CIK)](https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany) to identify corporations and individuals that file disclosures. You can search the [EDGAR full-text search](https://efts.sec.gov/LATEST/search-index?q=%22central+index+key%22&dateRange=custom&startdt=2021-01-01) to look up a CIK for a specific company; however, it is also possible to look up CIKs programmatically. The SEC publishes a JSON file that maps ticker symbols to CIK numbers, which we can download and parse using the `fromJSON()` function from the rjson package.
 
-For our example here, we'll examine Airbnb Inc. (cik=1559720) and Las Vegas Sands Corp. (cik=1300514).
+```{r tickermap}
+# Download the company ticker-to-CIK mapping from SEC EDGAR
+ticker.json = fromJSON(file="https://www.sec.gov/files/company_tickers.json")
+# Convert the nested list to a data frame
+ticker.df = data.frame(
+  cik = sapply(ticker.json, function(x) x$cik_str),
+  ticker = sapply(ticker.json, function(x) x$ticker),
+  company.name = sapply(ticker.json, function(x) x$title),
+  stringsAsFactors = FALSE
+)
+head(ticker.df)
+```
+
+Now we can look up the CIKs for any set of ticker symbols. For our example, we'll examine Airbnb Inc. (ABNB) and Las Vegas Sands Corp. (LVS).
+
+```{r tickerlookup}
+# Look up CIKs for our target tickers
+target.tickers = c("ABNB", "LVS")
+target.rows = ticker.df[ticker.df$ticker %in% target.tickers, ]
+target.rows
+```
 
 ```{r cik}
-ciks = c(1559720,1300514)
+ciks = target.rows$cik
+ciks
 ```
 
 
@@ -129,7 +165,7 @@ ciks = c(1559720,1300514)
 Now that we have the CIK identifiers for the companies, we can use the `getSentiment()` function from the edgar package to download the specified filings and generate a table showing some basic textual analysis statistics for the respective filings.
 
 ```{r computesentiment}
-sentidf = getSentiment(cik.no=ciks, form.type='10-K', filing.year=2021)
+sentidf = getSentiment(cik.no=ciks, form.type='10-K', filing.year=2023, useragent)
 sentidf
 ```
 
