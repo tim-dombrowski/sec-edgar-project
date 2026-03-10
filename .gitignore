@@ -47,3 +47,8 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
+
+# SEC Filing Data Files
+R Notebook/edgar_MasterIndex
+
+
