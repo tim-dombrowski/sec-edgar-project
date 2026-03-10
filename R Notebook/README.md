@@ -332,6 +332,69 @@ ciks
 
     ## [1] 1300514 1559720
 
+## Downloading Filings
+
+Now that we have the CIK numbers for our target companies, we can use
+the `getFilings()` function to download the actual text content of their
+SEC filings. This function creates a subdirectory called `edgar_Filings`
+in the working directory and saves each filing as a text file. The files
+are organized in subdirectories by CIK number and form type. Here we
+download the 10-K annual reports filed by our two companies in 2023.
+
+``` r
+getFilings(cik.no=ciks, form.type='10-K', datebeg='2023-01-01', dateend='2023-12-31', useragent)
+```
+
+    ## Downloading fillings. Please wait...
+    ##   |                                                                              |                                                                      |   0%  |                                                                              |===================================                                   |  50%  |                                                                              |======================================================================| 100%
+
+We can confirm the downloads by looking at the directory structure that
+was created.
+
+``` r
+list.files("edgar_Filings", recursive=TRUE) |> head(20)
+```
+
+    ## [1] "1300514/10-K/0001300514-24-000013.txt"
+    ## [2] "1559720/10-K/0001559720-24-000006.txt"
+
+## Parsing Filing Headers
+
+Each SEC filing includes a structured header section that contains
+metadata about the filer and the submission. The `getFilingHeader()`
+function extracts this information and returns it as a data frame with
+columns for attributes like the company's SIC industry code, state of
+incorporation, fiscal year end, and contact addresses. This structured
+metadata is useful for filtering or grouping companies in broader
+analyses.
+
+``` r
+headerdf = getFilingHeader(cik.no=ciks, form.type='10-K', datebeg='2023-01-01', dateend='2023-12-31', useragent)
+head(headerdf)
+```
+
+We can look at the column names to understand what information is
+available in the filing headers.
+
+``` r
+names(headerdf)
+```
+
+## Searching Filings for Keywords
+
+The `searchFilings()` function lets us search through the full text of
+the downloaded filings for specific keywords and count how often each
+appears. This is useful for quantifying how prominently a company
+discusses certain topics (such as risk factors, revenue drivers, or
+competitive dynamics) in its filings, without performing a full
+sentiment analysis. Below, we search for three keywords across the
+downloaded 10-K filings.
+
+``` r
+searchresult = searchFilings(cik.no=ciks, form.type='10-K', datebeg='2023-01-01', dateend='2023-12-31', keyword=c("risk","revenue","competition"), useragent)
+searchresult
+```
+
 ## Computing Sentiment Measures
 
 Now that we have the CIK identifiers for the companies, we can use the
