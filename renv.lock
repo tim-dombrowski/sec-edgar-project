@@ -185,7 +185,7 @@
     },
     "edgar": {
       "Package": "edgar",
-      "Version": "2.0.7",
+      "Version": "2.0.8",
       "Source": "Repository",
       "Repository": "CRAN",
       "Requirements": [
@@ -198,7 +198,7 @@
         "stringr",
         "tm"
       ],
-      "Hash": "1d507f4c815058f35291ec8d1316908f"
+      "Hash": "6030d39049aaf9b5864f272339f4c79e"
     },
     "ellipsis": {
       "Package": "ellipsis",
